@@ -6,9 +6,9 @@ import threading
 import queue
 import configparser
 
-def Receptor(page: ft.Page):
+def main(page: ft.Page):
     """
-    Servidor UDP con Flet que:
+    Servidor UDP:
     - Lee la configuración desde config.ini
     - Escucha en el puerto indicado
     - Reenvía los mensajes a todos los clientes conectados excepto al remitente
@@ -26,6 +26,7 @@ def Receptor(page: ft.Page):
     config = configparser.ConfigParser()
     config.read(r"C:\Users\Usuario\desktop\app_udp_python\config.ini")
     print("Secciones encontradas en config.ini:", config.sections())
+
 
     # Tomamos el puerto del servidor desde la sección [SERVER]
     server_port = int(config["SERVER"]["port"])
@@ -77,6 +78,7 @@ def Receptor(page: ft.Page):
                 mensajes_queue.put((addr, mensaje))
 
                 # Reenviar el mensaje solo a los demás clientes
+                # Si el mensaje no es de registro, se reenvía
                 if "se ha conectado" not in mensaje:
                     for client_addr in list(connected_clients):
                         if client_addr != addr:
@@ -90,6 +92,7 @@ def Receptor(page: ft.Page):
                 print("Error al recibir mensaje:", e)
                 mensajes_queue.put(("INFO", f"Error al recibir mensaje: {e}\n"))
                 break
+
 
     def iniciar_servidor_click(e):
         """
@@ -110,16 +113,25 @@ def Receptor(page: ft.Page):
         """
         while not mensajes_queue.empty():
             addr, mensaje = mensajes_queue.get()
-            # Se muestra el mensaje completo recibido (usuario, mensaje y archivo si existe)
+
+            # Si addr es "INFO", significa que es un mensaje interno de estado
             if addr == "INFO":
                 txt_mensajes.value += mensaje
             else:
-                txt_mensajes.value += (
-                    f"Remitente {addr}\n"
-                    "El mensaje recibido es:\n"
-                    f"{mensaje}\n"
-                    "Escuchando...\n"
-                )
+                # Asumimos el formato "Usuario: Mensaje"
+                if ":" in mensaje:
+                    user, msg = mensaje.split(":", 1)
+                    user = user.strip()
+                    msg = msg.strip()
+                    txt_mensajes.value += (
+                        f"Remitente {addr}\n"
+                        "El mensaje recibido es:\n"
+                        f"usuario: {user}\n"
+                        f"mensaje: {msg}\n"
+                        "Escuchando...\n"
+                    )
+                else:
+                    txt_mensajes.value += f"Mensaje recibido de {addr}: {mensaje}\n"
         page.update()
 
     # Botón para iniciar el servidor
@@ -143,4 +155,4 @@ def Receptor(page: ft.Page):
 
 # Iniciar la aplicación Flet
 if __name__ == "__main__":
-    ft.app(target=Receptor)
+    ft.app(target=main)

@@ -1,8 +1,0 @@
-# Ignorar carpeta de entorno virtual
-env/
-
-# Ignorar carpetas __pycache__
-__pycache__/
-
-# Ignorar archivos __init__
-__init__.py

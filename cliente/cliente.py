@@ -1,3 +1,5 @@
+# cliente/cliente.py
+
 import flet as ft
 import socket
 import threading
@@ -6,10 +8,9 @@ from dto.Midatagrama import Midatagrama
 import configparser
 import sys
 import subprocess
-import os
 
-def Emisor(page: ft.Page):
-    page.title = "CLIENTE UDP - Emisor y Receptor"
+def main(page: ft.Page):
+    page.title = "Cliente UDP - Emisor y Receptor"
     
     # Centramos la interfaz
     page.horizontal_alignment = "center"
@@ -25,27 +26,8 @@ def Emisor(page: ft.Page):
     server_port = int(config["CLIENT"]["server_port"])
     default_username = config["CLIENT"].get("username")  # Se usará lo configurado
 
-    # Variable para almacenar el usuario actual (para diferenciar envíos)
-    usuario_actual = default_username.strip() if default_username else ""
-
     # ----------------------------------------------------------------------
-    # 2. TextField de solo lectura para TODOS los mensajes (locales + chat)
-    # ----------------------------------------------------------------------
-    txt_logs = ft.TextField(
-        value="",
-        multiline=True,
-        width=400,
-        height=250,
-        read_only=True
-    )
-
-    def log_message(text: str):
-        """Agrega una línea de texto a txt_logs."""
-        txt_logs.value += text + "\n"
-        page.update()
-
-    # ----------------------------------------------------------------------
-    # 3. Componentes de la UI (Usuario, Mensaje, Botones, etc.)
+    # 2. Componentes de la UI
     # ----------------------------------------------------------------------
     lbl_titulo = ft.Text("CLIENTE UDP", color="red", weight="bold", size=20)
 
@@ -62,49 +44,40 @@ def Emisor(page: ft.Page):
         width=350
     )
 
-    # Variable global para almacenar la ruta del archivo seleccionado
-    selected_file = None
-
-    # ----------------------------------------------------------------------
-    # 4. FilePicker para seleccionar archivo
-    # ----------------------------------------------------------------------
-    def on_file_picker_result(e: ft.FilePickerResultEvent):
-        nonlocal selected_file
-        if e.files is not None and len(e.files) > 0:
-            selected_file = e.files[0].path  # ruta completa
-            log_message(f"Archivo seleccionado: {os.path.basename(selected_file)}")
-        else:
-            selected_file = None
-        page.update()
-
-    file_picker = ft.FilePicker(on_result=on_file_picker_result)
-    page.overlay.append(file_picker)
-
-    btn_seleccionar_archivo = ft.ElevatedButton(
-        "Seleccionar Archivo",
-        on_click=lambda e: file_picker.pick_files(allowed_extensions=["mp3"])
+    txt_estado = ft.TextField(
+        value="",
+        multiline=True,
+        width=250,
+        height=150,
+        read_only=True
     )
 
+    btn_enviar = ft.ElevatedButton("Enviar")
+
     # ----------------------------------------------------------------------
-    # 5. Crear socket para envío y recepción
+    # 3. Crear socket para envío y recepción
     # ----------------------------------------------------------------------
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("0.0.0.0", 0))  # Puerto aleatorio para recibir respuestas
+    # Bind en un puerto aleatorio para recibir respuestas
+    sock.bind(("0.0.0.0", 0))
 
-    # Cola para los mensajes recibidos
+    # Cola para los mensajes recibidos en el hilo
     mensajes_queue = queue.Queue()
 
     # ----------------------------------------------------------------------
-    # 6. Hilo de recepción (escucha en segundo plano)
+    # 4. Hilo de recepción
     # ----------------------------------------------------------------------
     def escuchar():
+        """
+        Hilo que permanece escuchando en el socket local.
+        Cada datagrama se decodifica y se coloca en mensajes_queue.
+        """
         while True:
             try:
                 data, addr = sock.recvfrom(1024)
                 mensaje = data.decode('utf-8')
                 mensajes_queue.put(mensaje)
             except OSError as e:
-                # Error específico de Windows si se cierra el socket, etc.
                 if hasattr(e, "winerror") and e.winerror == 10054:
                     continue
                 else:
@@ -115,69 +88,66 @@ def Emisor(page: ft.Page):
     hilo_escucha.start()
 
     # ----------------------------------------------------------------------
-    # 7. Función para refrescar y mostrar los mensajes recibidos
+    # 5. Función para refrescar mensajes en la interfaz
     # ----------------------------------------------------------------------
     def refrescar_mensajes():
+        """
+        Saca todos los mensajes de la cola mensajes_queue y los concatena en txt_estado.
+        """
         while not mensajes_queue.empty():
             msg = mensajes_queue.get()
-            # Aquí, en lugar de contenedores, simplemente agregamos el texto a txt_logs
-            log_message(msg)
-        page.update()
+            txt_estado.value += f"{msg}\n"
 
     # ----------------------------------------------------------------------
-    # 8. Función para enviar un mensaje
+    # 6. Función para enviar un mensaje
     # ----------------------------------------------------------------------
     def enviar_click(e):
         usuario = txt_usuario.value.strip()
         mensaje = txt_mensaje.value.strip()
 
-        # Validaciones
+        # Validación: ambos campos vacíos
         if not usuario and not mensaje:
-            log_message("Debe ingresar un usuario y un mensaje")
+            txt_estado.value += "Debe ingresar un usuario y un mensaje\n"
+            page.update()
             return
 
+        # Validación: campo usuario vacío
         if not usuario:
-            log_message("No has ingresado usuario, por favor intenta enviar nuevamente")
+            txt_estado.value += "No has ingresado usuario, por favor intenta enviar nuevamente\n"
+            page.update()
             return
 
+        # Validación: campo mensaje vacío
         if not mensaje:
-            log_message("No hay mensaje para enviar")
+            txt_estado.value += "No hay mensaje para enviar\n"
+            page.update()
             return
 
-        if not selected_file:
-            log_message("Debe registrar un archivo")
-            return
-
-        if not selected_file.lower().endswith(".mp3"):
-            log_message("El archivo debe tener extensión .mp3")
-            return
-
-        # Preparar contenido a enviar
-        nombre_archivo = os.path.basename(selected_file)
-        contenido = f"{usuario}: {mensaje}\narchivo: {nombre_archivo}"
+        contenido = f"{usuario}: {mensaje}"
         datagrama = Midatagrama.crear_datagrama(server_ip, server_port, contenido)
 
         try:
             sock.sendto(datagrama.get_bytes(), (datagrama.ip, datagrama.puerto))
-            log_message("Mensaje enviado")
+            txt_estado.value += "Mensaje enviado\n"
             txt_mensaje.value = ""
         except Exception as ex:
-            log_message(f"Error al enviar: {ex}")
+            txt_estado.value += f"Error al enviar: {ex}\n"
         finally:
             page.update()
 
-    btn_enviar = ft.ElevatedButton("Enviar", on_click=enviar_click)
+    btn_enviar.on_click = enviar_click
 
     # ----------------------------------------------------------------------
-    # 9. Botón "Refrescar" para leer mensajes pendientes
+    # 7. Botón "Refrescar" para actualizar la interfaz con mensajes pendientes
     # ----------------------------------------------------------------------
     def refrescar_click(e):
         refrescar_mensajes()
+        page.update()
 
     btn_refrescar = ft.ElevatedButton("Refrescar", on_click=refrescar_click)
 
     # ----------------------------------------------------------------------
-    # 10. Disposición de la interfaz
+    # 8. Disposición de la interfaz
     # ----------------------------------------------------------------------
     layout = ft.Column(
         controls=[
@@ -186,9 +156,8 @@ def Emisor(page: ft.Page):
             txt_usuario,
             lbl_mensaje,
             txt_mensaje,
-            btn_seleccionar_archivo,
             ft.Row([btn_enviar, btn_refrescar], alignment="center"),
-            txt_logs  # Aquí se muestran TODOS los mensajes
+            txt_estado
         ],
         alignment="center",
         horizontal_alignment="center"
@@ -197,15 +166,19 @@ def Emisor(page: ft.Page):
     page.add(layout)
 
     # ----------------------------------------------------------------------
-    # 11. Enviar mensaje de registro para que el servidor registre el cliente
+    # 9. Enviar mensaje de registro para que el servidor registre el cliente
     # ----------------------------------------------------------------------
+    # Se envía el mensaje usando el valor ingresado en el campo de usuario.
     registro = f"{txt_usuario.value.strip()} se ha conectado"
     datagrama_registro = Midatagrama.crear_datagrama(server_ip, server_port, registro)
     try:
         sock.sendto(datagrama_registro.get_bytes(), (datagrama_registro.ip, datagrama_registro.puerto))
-        log_message("Registrado en el servidor")
+        txt_estado.value += "Registrado en el servidor\n"
+        page.update()
     except Exception as ex:
-        log_message(f"Error al registrar: {ex}")
+        txt_estado.value += f"Error al registrar: {ex}\n"
+        page.update()
+
 
 # ----------------------------------------------------------------------
 # Lanzamiento automático de N clientes (desde el mismo cliente)
@@ -217,11 +190,11 @@ if __name__ == "__main__":
     
     # Si se pasa un argumento, se entiende que es una instancia secundaria
     if len(sys.argv) > 1:
-        ft.app(target=Emisor)
+        ft.app(target=main)
     else:
         # Esta instancia "maestra" lanza las demás instancias
         for i in range(1, num_clients):
             username = config["CLIENT"].get("username").strip()
             subprocess.Popen(["python", "-m", "cliente.cliente", username])
             print(f"Lanzando cliente {i+1} con username: {username}")
-        ft.app(target=Emisor)
+        ft.app(target=main)
