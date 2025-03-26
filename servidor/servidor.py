@@ -29,7 +29,7 @@ def Receptor(page: ft.Page):
 
     # Tomamos el puerto del servidor desde la sección [SERVER]
     server_port = int(config["SERVER"]["port"])
-    max_clients = int(config["SERVER"].get("max_clients", "10"))  # por si lo necesitas
+    max_clients = int(config["SERVER"].get("max_clients", "10"))
     
     # Etiqueta de título
     lbl_titulo = ft.Text(
@@ -54,7 +54,7 @@ def Receptor(page: ft.Page):
     # Conjunto de direcciones (ip, puerto) de clientes conectados
     connected_clients = set()
 
-    # Hilo de escucha (se definirá al pulsar el botón "Iniciar Servidor")
+    # Hilo de escucha (se define al pulsar el botón "Iniciar Servidor")
     hilo_escucha = None
 
     def escuchar_udp():
@@ -66,7 +66,8 @@ def Receptor(page: ft.Page):
 
         while True:
             try:
-                data, addr = sock.recvfrom(1024)
+                # Se utiliza un buffer mayor para recibir mensajes grandes
+                data, addr = sock.recvfrom(65535)
                 mensaje = data.decode('utf-8')
                 
                 # Registrar al cliente si aún no está en la lista
@@ -110,7 +111,6 @@ def Receptor(page: ft.Page):
         """
         while not mensajes_queue.empty():
             addr, mensaje = mensajes_queue.get()
-            # Se muestra el mensaje completo recibido (usuario, mensaje y archivo si existe)
             if addr == "INFO":
                 txt_mensajes.value += mensaje
             else:
@@ -128,7 +128,7 @@ def Receptor(page: ft.Page):
     # Botón para refrescar los mensajes pendientes
     btn_refrescar = ft.ElevatedButton("Refrescar", on_click=refrescar_click)
 
-    # Organizamos todo en una columna, centrada horizontal y verticalmente
+    # Organizar la interfaz en una columna centrada
     layout = ft.Column(
         controls=[
             lbl_titulo,
