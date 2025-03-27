@@ -107,19 +107,25 @@ def Receptor(page: ft.Page):
     def refrescar_click(e):
         """
         Función que se ejecuta al pulsar "Refrescar".
-        Lee todos los mensajes de la cola y los muestra en 'txt_mensajes'.
+        Lee todos los mensajes de la cola y los muestra en 'txt_mensajes',
+        filtrando los mensajes de chunks (que comienzan con "FILE;") para no saturar la UI.
         """
         while not mensajes_queue.empty():
             addr, mensaje = mensajes_queue.get()
             if addr == "INFO":
                 txt_mensajes.value += mensaje
             else:
-                txt_mensajes.value += (
-                    f"Remitente {addr}\n"
-                    "El mensaje recibido es:\n"
-                    f"{mensaje}\n"
-                    "Escuchando...\n"
-                )
+                # Si el mensaje es de un chunk, lo ignoramos en la interfaz
+                if mensaje.startswith("FILE;"):
+                    # Opcional: imprimir detalles en la consola (truncado)
+                    print(f"Chunk recibido de {addr}: {mensaje[:50]}...")
+                else:
+                    txt_mensajes.value += (
+                        f"Remitente {addr}\n"
+                        "El mensaje recibido es:\n"
+                        f"{mensaje}\n"
+                        "Escuchando...\n"
+                    )
         page.update()
 
     # Botón para iniciar el servidor

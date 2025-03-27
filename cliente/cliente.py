@@ -232,7 +232,7 @@ def Emisor(page: ft.Page):
         datagrama = Midatagrama.crear_datagrama(server_ip, server_port, contenido)
         try:
             sock.sendto(datagrama.get_bytes(), (datagrama.ip, datagrama.puerto))
-            log_message("Mensaje enviado")
+            log_message("Mensaje y archivo enviado correctamente")
             txt_mensaje.value = ""
         except Exception as ex:
             log_message(f"Error al enviar mensaje: {ex}")
@@ -254,7 +254,7 @@ def Emisor(page: ft.Page):
                     file_msg = f"FILE;{usuario};{os.path.basename(selected_file)};{chunk_index};{last_flag};{chunk_b64}"
                     datagrama_file = Midatagrama.crear_datagrama(server_ip, server_port, file_msg)
                     sock.sendto(datagrama_file.get_bytes(), (datagrama_file.ip, datagrama_file.puerto))
-                    log_message(f"Enviado chunk {chunk_index} (last: {last_flag})")
+                    print(f"Enviado chunk {chunk_index} (last: {last_flag})")
                     chunk_index += 1
         except Exception as ex:
             log_message(f"Error al enviar archivo: {ex}")
